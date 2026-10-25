@@ -1,6 +1,6 @@
 [package]
 name = "ember"
-version = "0.1.0"
+version = "0.1.1"
 description = "Your Deadlock status in Discord, worded your way"
 license = "MIT"
 authors = ["Mittikbb"]
