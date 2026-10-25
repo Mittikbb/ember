@@ -119,6 +119,15 @@ impl Settings {
             s.states.entry(phase).or_insert(cfg);
         }
         s.states.retain(|p, _| Phase::SHOWN.contains(p));
+        // 0.1.0's match preset had only {rank} on the second line, which hides the
+        // live numbers; such untouched lines get the current preset, in their language.
+        if let Some(m) = s.states.get_mut(&Phase::Match) {
+            if m.state.trim() == "{rank}" {
+                let cyrillic = m.details.chars().any(|c| ('\u{400}'..='\u{4ff}').contains(&c));
+                let lang = if cyrillic { Lang::Ru } else { Lang::En };
+                m.state = preset(lang)[&Phase::Match].state.clone();
+            }
+        }
         s.buttons.truncate(2);
         s
     }
@@ -128,6 +137,27 @@ impl Settings {
         let tmp = path.with_extension("json.tmp");
         fs::write(&tmp, bytes).map_err(|e| e.to_string())?;
         fs::rename(&tmp, path).map_err(|e| e.to_string())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn old_match_line_gets_the_numbers() {
+        let dir = std::env::temp_dir().join(format!("ember-settings-{}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("settings.json");
+        let mut old = Settings::default();
+        let m = old.states.get_mut(&Phase::Match).unwrap();
+        m.details = "В матче за {hero} || В матче".into();
+        m.state = "{rank}".into();
+        old.save(&path).unwrap();
+
+        let loaded = Settings::load(&path);
+        assert_eq!(loaded.states[&Phase::Match].state, "{kda} · {souls} душ || {rank}");
+        let _ = fs::remove_dir_all(dir);
     }
 }
 

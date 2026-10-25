@@ -128,6 +128,10 @@ impl Tracker {
             self.on_map(map, t);
         } else if let Some(addr) = between(text, "[Client] CL:  Connected to '", "'") {
             self.local_server = addr.starts_with("loopback") || addr.starts_with("127.0.0.1");
+        } else if text.contains("Send msg") && text.contains("(k_EMsgClientToGCStartMatchmaking)") {
+            self.on_queue(true, t);
+        } else if text.contains("Send msg") && text.contains("(k_EMsgClientToGCStopMatchmaking)") {
+            self.on_queue(false, t);
         } else if text.contains("Send msg") && text.contains("(k_EMsgClientToGCPartySetReadyState)") {
             self.on_ready_toggle(t);
         } else if let Some(id) = between(text, "Lobby ", " created").and_then(|s| s.split(" for Match ").nth(1)) {
@@ -191,7 +195,22 @@ impl Tracker {
         self.hero = Some(folder.to_string());
     }
 
-    /// The same message starts and stops the search.
+    /// Searching alone: separate messages start and stop the search.
+    fn on_queue(&mut self, start: bool, t: i64) {
+        match (start, self.phase) {
+            (true, Phase::Hideout | Phase::Launching | Phase::PostGame) => {
+                self.queue_start = Some(t);
+                self.set(Phase::Queue, t);
+            }
+            (false, Phase::Queue) => {
+                self.queue_start = None;
+                self.set(Phase::Hideout, t);
+            }
+            _ => {}
+        }
+    }
+
+    /// In a party, readying up starts the search and the same message stops it.
     fn on_ready_toggle(&mut self, t: i64) {
         match self.phase {
             Phase::Hideout | Phase::Launching | Phase::PostGame => {
@@ -385,6 +404,19 @@ mod tests {
         assert_eq!(t.phase, Phase::Hideout);
         assert!(t.finished.is_some());
         assert_eq!(t.match_id, None);
+    }
+
+    #[test]
+    fn solo_queue() {
+        let mut lines = BOOT.to_vec();
+        lines.push("10/25 14:01:29 [GCClient] Send msg 9010 (k_EMsgClientToGCStartMatchmaking), 305 bytes");
+        lines.push("10/25 14:02:25 [GCClient] Send msg 9017 (k_EMsgClientToGCIsInMatchmaking), 17 bytes");
+        let t = run(&lines);
+        assert_eq!(t.phase, Phase::Queue);
+        assert!(t.queue_start.is_some());
+
+        lines.push("10/25 14:03:00 [GCClient] Send msg 9012 (k_EMsgClientToGCStopMatchmaking), 17 bytes");
+        assert_eq!(run(&lines).phase, Phase::Hideout);
     }
 
     #[test]

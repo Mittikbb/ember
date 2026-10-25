@@ -146,13 +146,7 @@ pub fn variables(f: &Facts, lang: Lang) -> HashMap<&'static str, String> {
         v.insert("steam_id", id.to_string());
     }
     if let Some(s) = &f.stats {
-        let result = match (s.won, ru) {
-            (true, true) => "Победа",
-            (false, true) => "Поражение",
-            (true, false) => "Won",
-            (false, false) => "Lost",
-        };
-        v.insert("result", result.into());
+        v.insert("result", result_word(s.won, ru).into());
         v.insert("kda", format!("{}/{}/{}", s.kills, s.deaths, s.assists));
         v.insert("kills", s.kills.to_string());
         v.insert("deaths", s.deaths.to_string());
@@ -186,12 +180,24 @@ pub fn variables(f: &Facts, lang: Lang) -> HashMap<&'static str, String> {
         if l.match_mode.is_some() || l.game_mode.is_some() {
             v.insert("mode", mode_name(l.game_mode.unwrap_or(0), l.match_mode.unwrap_or(0), ru).into());
         }
+        if let Some(won) = l.won {
+            v.insert("result", result_word(won, ru).into());
+        }
         if let Some((round, ours, theirs)) = l.brawl {
             v.insert("round", round.to_string());
             v.insert("score", format!("{ours}:{theirs}"));
         }
     }
     v
+}
+
+fn result_word(won: bool, ru: bool) -> &'static str {
+    match (won, ru) {
+        (true, true) => "Победа",
+        (false, true) => "Поражение",
+        (true, false) => "Won",
+        (false, false) => "Lost",
+    }
 }
 
 /// 22196 → "22.2k".
@@ -383,6 +389,16 @@ mod tests {
         assert_eq!(render_line("{kda} · {souls} душ || {rank}", &v).as_deref(), Some("7/2/11 · 24.1k душ"));
         assert_eq!(v["mode"], "Рейтинговый");
         assert_eq!(render_line("Раунд {round}, {score}", &v).as_deref(), Some("Раунд 3, 2:1"));
+        // The post-game from memory, before deadlock-api has the match.
+        let f = Facts {
+            phase: Phase::PostGame,
+            live: Some(LiveMatch { kills: Some(9), deaths: Some(3), assists: Some(6), won: Some(true), ..Default::default() }),
+            hero: Some(HeroFacts { name: "Rem".into(), ..Default::default() }),
+            ..Default::default()
+        };
+        let v = variables(&f, Lang::Ru);
+        assert_eq!(render_line("{result} за {hero} || Матч завершён", &v).as_deref(), Some("Победа за Rem"));
+        assert_eq!(v["kda"], "9/3/6");
         // Without memory the same line falls back to the rank.
         let v = variables(&Facts { rank: Some(RankFacts { name: "Emissary 3".into(), image: None }), ..Default::default() }, Lang::Ru);
         assert_eq!(render_line("{kda} · {souls} душ || {rank}", &v).as_deref(), Some("Emissary 3"));

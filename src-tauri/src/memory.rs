@@ -48,6 +48,9 @@ pub struct LiveMatch {
     pub game_mode: Option<u32>,
     /// Street Brawl: round, your team's score, the other team's.
     pub brawl: Option<(i32, i32, i32)>,
+    pub match_id: Option<u64>,
+    /// Whether your team won, once the match is decided.
+    pub won: Option<bool>,
 }
 
 #[derive(Clone, Debug, Default, Serialize)]
@@ -111,6 +114,11 @@ pub fn run(app: AppHandle) {
             }
         };
         let mut live = shared.live.lock().unwrap();
+        // The last numbers of a match outlive it: the post-game shows them
+        // before deadlock-api has the match.
+        if let Some(m) = found.as_ref().filter(|m| m.in_match && !m.spectating) {
+            live.last_match = Some(m.clone());
+        }
         live.memory = found;
         live.memory_status = state;
     }
@@ -138,5 +146,7 @@ fn read(snap: &LiveSnapshot) -> LiveMatch {
         match_mode: snap.match_mode_raw.filter(|&m| m > 0),
         game_mode: snap.game_mode_raw.filter(|&m| m > 0),
         brawl,
+        match_id: snap.match_id.filter(|&id| id > 0),
+        won: snap.winning_team.zip(team).map(|(winner, ours)| winner == ours),
     }
 }

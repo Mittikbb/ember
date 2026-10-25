@@ -75,6 +75,8 @@ struct Live {
     game_icon: Option<String>,
     memory: Option<memory::LiveMatch>,
     memory_status: memory::MemoryStatus,
+    /// The last memory read of a match you played.
+    last_match: Option<memory::LiveMatch>,
 }
 
 struct Shared {
@@ -152,6 +154,19 @@ fn facts(live: &Live, s: &Settings, now: i64) -> Facts {
     };
     f.rank = live.badge.and_then(|b| rank_facts(&live.catalog, b));
 
+    // Post-game before deadlock-api has the match: the numbers memory saw last.
+    if post_game && f.stats.is_none() && s.memory {
+        let last = live.last_match.as_ref().filter(|m| {
+            m.match_id.is_none() || m.match_id == f.match_id || f.match_id.is_none()
+        });
+        if let Some(m) = last {
+            if let Some(h) = m.hero_id.and_then(|id| live.catalog.hero_by_id(id)) {
+                f.hero = Some(hero_facts(h));
+            }
+            f.live = Some(m.clone());
+        }
+    }
+
     // Memory, when allowed: the exact hero, live numbers, and spectating.
     let fresh = live.memory.as_ref().filter(|m| s.memory && now - m.read_at <= memory::FRESH);
     if let Some(m) = fresh {
@@ -207,6 +222,8 @@ fn with_samples(mut f: Facts, live: &Live, phase: Phase, memory: bool, now: i64)
             match_mode: Some(4),
             game_mode: Some(1),
             brawl: None,
+            match_id: None,
+            won: None,
         });
     }
     if f.hero.is_none() {
