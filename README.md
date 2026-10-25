@@ -7,6 +7,11 @@ finding a match, in a match as your hero, the result once it's over. Every game 
 its own two lines, picture and timer, and the window shows a live copy of the card your
 friends will see.
 
+## Download
+
+Get the installer from the [latest release](https://github.com/Mittikbb/ember/releases/latest)
+(Windows 10/11). It isn't code-signed yet, so SmartScreen may warn: *More info → Run anyway*.
+
 ## Features
 
 - **A status per game state:** starting, Hideout, finding a match, match found, match
