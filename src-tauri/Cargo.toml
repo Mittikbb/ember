@@ -1,0 +1,45 @@
+[package]
+name = "ember"
+version = "0.1.0"
+description = "Your Deadlock status in Discord, worded your way"
+license = "MIT"
+authors = ["Mittikbb"]
+edition = "2024"
+
+[lib]
+# The `_lib` suffix keeps the lib name apart from the bin name on Windows,
+# see https://github.com/rust-lang/cargo/issues/8519
+name = "ember_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon"] }
+tauri-plugin-opener = "2"
+tauri-plugin-autostart = "2"
+tauri-plugin-single-instance = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+ureq = { version = "2", features = ["json"] }
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+# Opt-in live numbers from the game's memory: read-only, offsets from the
+# game's own Source 2 schema. MIT OR Apache-2.0.
+deadlock-reader = { git = "https://github.com/deadlock-plus/deadlock-rs", rev = "40db33c5eadd848f978868295200c9479663bdff" }
+
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.62", features = [
+    "Win32_Foundation",
+    "Win32_System_Diagnostics_ToolHelp",
+    "Win32_System_Pipes",
+    "Win32_System_Registry",
+    "Win32_System_Threading",
+] }
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = 3
+panic = "abort"
+strip = true
